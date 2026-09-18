@@ -22,12 +22,12 @@ val releaseSigningAvailable = listOf(
 
 android {
     namespace = "pl.usundlug.crmbridge"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "pl.usundlug.crmbridge"
         minSdk = 29
-        targetSdk = 37
+        targetSdk = 36
         versionCode = 9
         versionName = "0.8.1"
 
