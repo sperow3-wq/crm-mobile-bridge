@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">CRM Mobile Bridge</string>
+    <string name="call_screening_service_label">Identyfikacja połączeń CRM</string>
+</resources>
