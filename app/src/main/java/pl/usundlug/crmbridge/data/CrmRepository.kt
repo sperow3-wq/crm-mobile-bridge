@@ -55,8 +55,10 @@ class CrmRepository(
             deviceStore.serviceSimSlotIndex = simSlotIndex
             deviceStore.serviceCarrierName = carrierName
             deviceStore.deviceToken = match.deviceToken
-            ClientCacheScheduler.schedulePeriodic(appContext)
-            ClientCacheScheduler.requestNow(appContext)
+            if (!match.deviceToken.isNullOrBlank()) {
+                ClientCacheScheduler.schedulePeriodic(appContext)
+                ClientCacheScheduler.requestNow(appContext)
+            }
         }
         match
     }
