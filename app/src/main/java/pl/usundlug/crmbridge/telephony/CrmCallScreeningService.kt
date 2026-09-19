@@ -1,6 +1,5 @@
 package pl.usundlug.crmbridge.telephony
 
-import android.content.Intent
 import android.telecom.Call
 import android.telecom.CallScreeningService
 import kotlinx.coroutines.CoroutineScope
@@ -11,8 +10,6 @@ import pl.usundlug.crmbridge.CrmBridgeApp
 import pl.usundlug.crmbridge.data.CallDirection
 import pl.usundlug.crmbridge.data.ClientMatch
 import pl.usundlug.crmbridge.data.CallSession
-import pl.usundlug.crmbridge.notifications.CallerIdNotifier
-import pl.usundlug.crmbridge.ui.CallerIdActivity
 import pl.usundlug.crmbridge.util.PhoneNumberNormalizer
 import java.util.UUID
 
@@ -58,9 +55,13 @@ class CrmCallScreeningService : CallScreeningService() {
             // Caller ID during ringing must not wait for the network. If the encrypted
             // cache already knows this number, show it immediately and refresh CRM in
             // the background. This avoids Android showing only the raw phone number.
+            app.deviceStore.lastIncomingPhone = number
+            app.deviceStore.lastCallerIdAtEpochMs = System.currentTimeMillis()
+
             val cached = app.clientCacheStore.find(number)
             if (incoming && app.deviceStore.callerIdEnabled && cached != null) {
-                showCallerId(app, number, cached, null)
+                app.deviceStore.lastCallerIdStatus = "CACHE: ${cached.clientName ?: "klient CRM"}"
+                CallerIdPresenter.show(this@CrmCallScreeningService, app, number, cached, null)
             }
 
             var lookupError: String? = null
@@ -82,6 +83,14 @@ class CrmCallScreeningService : CallScreeningService() {
             if (client.matched && client.clientId != null) {
                 app.deviceStore.lastClientId = client.clientId
                 app.deviceStore.lastClientName = client.clientName
+                app.deviceStore.lastCallerIdStatus = if (cached != null) {
+                    "CACHE + CRM: ${client.clientName ?: "klient CRM"}"
+                } else {
+                    "CRM: ${client.clientName ?: "klient CRM"}"
+                }
+            } else if (cached == null) {
+                app.deviceStore.lastCallerIdStatus = lookupError?.let { "BŁĄD CRM: $it" }
+                    ?: "BRAK DOPASOWANIA: $number"
             }
 
             val session = CallSession(
@@ -107,52 +116,9 @@ class CrmCallScreeningService : CallScreeningService() {
             // available. When cache was already shown, the fresh result is stored by
             // identifyClient() and will be used immediately on the next call.
             if (incoming && app.deviceStore.callerIdEnabled && cached == null) {
-                showCallerId(app, number, client, lookupError)
+                CallerIdPresenter.show(this@CrmCallScreeningService, app, number, client, lookupError)
             }
         }
     }
 
-    private fun showCallerId(app: CrmBridgeApp, number: String, client: ClientMatch, lookupError: String?) {
-        val intent = Intent(this, CallerIdActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            putExtra(CallerIdActivity.EXTRA_PHONE, number)
-            putExtra(CallerIdActivity.EXTRA_CLIENT_ID, client.clientId ?: -1L)
-            putExtra(CallerIdActivity.EXTRA_CLIENT_NAME, client.clientName ?: "Nieznany numer")
-            putExtra(CallerIdActivity.EXTRA_PRODUCT, client.product ?: "")
-            putExtra(CallerIdActivity.EXTRA_STAGE, client.stage ?: "")
-            putExtra(
-                CallerIdActivity.EXTRA_GUARDIAN,
-                client.guardianName ?: app.deviceStore.employeeName.orEmpty()
-            )
-            putExtra(CallerIdActivity.EXTRA_MATCHED, client.matched)
-            putExtra(CallerIdActivity.EXTRA_OVERDUE_COUNT, client.overdueInvoicesCount)
-            putExtra(CallerIdActivity.EXTRA_OVERDUE_AMOUNT, client.overdueAmount)
-            putExtra(CallerIdActivity.EXTRA_CURRENCY, client.currency)
-            putExtra(CallerIdActivity.EXTRA_DATA_SOURCE, client.dataSource.name)
-            putExtra(CallerIdActivity.EXTRA_DATA_UPDATED_AT, client.dataUpdatedAtEpochMs ?: 0L)
-            putExtra(CallerIdActivity.EXTRA_LOOKUP_ERROR, lookupError.orEmpty())
-        }
-        val title = if (client.matched) {
-            client.clientName ?: "Klient CRM"
-        } else {
-            "Połączenie przychodzące"
-        }
-        val text = if (client.matched) {
-            listOfNotNull(
-                client.product?.takeIf { it.isNotBlank() },
-                client.stage?.takeIf { it.isNotBlank() }
-            ).joinToString(" • ").ifBlank { number }
-        } else {
-            number
-        }
-
-        // Full-screen call notification is the supported path on modern Android.
-        // It can open CallerIdActivity over the lock screen; if the OEM suppresses
-        // the full-screen launch, the user still gets a high-priority heads-up card.
-        CallerIdNotifier.show(this, intent, title, text)
-
-        // On devices that still allow background activity starts from the call
-        // screening role, this gives the fastest possible display.
-        runCatching { startActivity(intent) }
-    }
 }
