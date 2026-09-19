@@ -85,6 +85,15 @@ private fun SetupScreen(
                 ?: "Urządzenie nie jest jeszcze sparowane"
         )
     }
+    var authStatus by remember {
+        mutableStateOf(
+            if (app.deviceStore.deviceToken.isNullOrBlank()) {
+                "Autoryzacja urządzenia: brak tokenu CRM"
+            } else {
+                "Autoryzacja urządzenia: token zapisany lokalnie — wymaga ponownej weryfikacji"
+            }
+        )
+    }
     var detectedPhone by remember { mutableStateOf(app.deviceStore.servicePhone.orEmpty()) }
     var serviceSimInfo by remember { mutableStateOf(formatServiceSimInfo(app.deviceStore.serviceSimSlotIndex, app.deviceStore.serviceCarrierName, app.deviceStore.serviceSubscriptionId)) }
     var pendingSync by remember { mutableStateOf(app.syncQueueStore.countPending()) }
@@ -150,14 +159,7 @@ private fun SetupScreen(
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Powiązanie pracownika", fontWeight = FontWeight.Bold)
                     Text(status)
-                    Text(
-                        if (app.deviceStore.deviceToken.isNullOrBlank()) {
-                            "Autoryzacja urządzenia: brak tokenu CRM"
-                        } else {
-                            "Autoryzacja urządzenia: aktywna"
-                        },
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    Text(authStatus, style = MaterialTheme.typography.bodySmall)
                     if (detectedPhone.isNotBlank()) Text("Numer: $detectedPhone")
                     if (serviceSimInfo.isNotBlank()) Text(serviceSimInfo, style = MaterialTheme.typography.bodySmall)
                 }
@@ -252,6 +254,7 @@ private fun SetupScreen(
                         return@launch
                     }
 
+                    authStatus = "Autoryzacja urządzenia: weryfikacja z CRM…"
                     var matchedCandidate: ServiceSimCandidate? = null
                     var matchedName: String? = null
                     var matchedTokenPresent = false
@@ -292,8 +295,10 @@ private fun SetupScreen(
                         SmsSyncScheduler.schedulePeriodic(context)
                         app.ensureSmsObserver()
                         status = if (!matchedTokenPresent) {
+                            authStatus = "Autoryzacja urządzenia: brak tokenu z CRM"
                             "Rozpoznano pracownika: ${matchedName ?: "przypisany pracownik"}, ale CRM nie zwrócił tokenu urządzenia. Parowanie po stronie CRM jest niepełne — dane klientów i Caller ID nie będą dostępne."
                         } else {
+                            authStatus = "Autoryzacja urządzenia: aktywna — potwierdzona przez CRM"
                             val cacheResult = runCatching { app.repository.syncClientCache() }
                             refreshCacheStats()
                             cacheResult.fold(
@@ -306,6 +311,7 @@ private fun SetupScreen(
                             )
                         }
                     } else {
+                        authStatus = "Autoryzacja urządzenia: niepotwierdzona"
                         status = lastError ?: "Żaden aktywny numer SIM nie jest przypisany do pracownika w CRM."
                     }
                 }
@@ -374,6 +380,7 @@ private fun SetupScreen(
                 lastClientId = null
                 lastClientName = null
                 refreshCacheStats()
+                authStatus = "Autoryzacja urządzenia: brak tokenu CRM"
                 status = "Urządzenie odłączone od pracownika, a lokalna baza klientów usunięta."
             }) {
                 Text("Odłącz urządzenie")
