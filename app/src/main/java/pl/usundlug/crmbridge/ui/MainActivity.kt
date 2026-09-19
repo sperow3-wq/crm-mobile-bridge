@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +24,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,6 +33,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -79,6 +82,12 @@ private fun SetupScreen(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+
+    fun isCallScreeningRoleHeld(): Boolean {
+        val roleManager = context.getSystemService(RoleManager::class.java) ?: return false
+        return roleManager.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING) &&
+            roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
+    }
     var status by remember {
         mutableStateOf(
             app.deviceStore.employeeName?.let { "Połączono z pracownikiem: $it" }
@@ -103,6 +112,9 @@ private fun SetupScreen(
     var lastClientId by remember { mutableStateOf(app.deviceStore.lastClientId) }
     var lastClientName by remember { mutableStateOf(app.deviceStore.lastClientName) }
     var pendingWrapUps by remember { mutableStateOf(app.callWrapUpStore.count()) }
+    var callerIdEnabled by remember { mutableStateOf(app.deviceStore.callerIdEnabled) }
+    var callScreeningRoleHeld by remember { mutableStateOf(isCallScreeningRoleHeld()) }
+    var cacheSyncInProgress by remember { mutableStateOf(false) }
 
     fun refreshSyncCounters() {
         pendingSync = app.syncQueueStore.countPending()
