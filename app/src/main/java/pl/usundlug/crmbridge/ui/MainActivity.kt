@@ -223,6 +223,13 @@ private fun SetupScreen(
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Identyfikacja offline", fontWeight = FontWeight.Bold)
                     Text("Klienci w zaszyfrowanej pamięci: $cachedClients")
+                    if (cacheSyncInProgress) {
+                        Text(
+                            "Synchronizacja trwa… licznik aktualizuje się na żywo.",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                     Text(
                         if (cacheLastSync > 0L) {
                             "Ostatnia aktualizacja: ${formatUiDateTime(cacheLastSync)}"
@@ -343,8 +350,39 @@ private fun SetupScreen(
                 Text("2. Sparuj telefon z CRM")
             }
 
-            Button(onClick = requestCallScreeningRole) {
-                Text("3. Włącz identyfikację połączeń")
+            Card(Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(0.82f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text("Identyfikacja połączeń", fontWeight = FontWeight.Bold)
+                        Text(
+                            when {
+                                !callerIdEnabled -> "Wyłączona"
+                                callScreeningRoleHeld -> "Włączona • uprawnienie systemowe aktywne"
+                                else -> "Włączona w aplikacji • Android wymaga jeszcze zgody"
+                            },
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Switch(
+                        checked = callerIdEnabled,
+                        onCheckedChange = { enabled ->
+                            app.deviceStore.callerIdEnabled = enabled
+                            callerIdEnabled = enabled
+                            if (enabled && !isCallScreeningRoleHeld()) {
+                                requestCallScreeningRole()
+                            }
+                        }
+                    )
+                }
             }
 
             OutlinedButton(onClick = {
