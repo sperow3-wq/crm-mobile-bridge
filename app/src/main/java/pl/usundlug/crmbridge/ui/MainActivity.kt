@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import pl.usundlug.crmbridge.BuildConfig
 import pl.usundlug.crmbridge.CrmBridgeApp
 import pl.usundlug.crmbridge.device.PhoneNumberResolver
 import pl.usundlug.crmbridge.device.ServiceSimCandidate
@@ -143,12 +144,20 @@ private fun SetupScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text("CRM Mobile Bridge", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text("Wersja 0.8.0 — telefon służbowy + podsumowanie rozmów")
+            Text("Wersja ${BuildConfig.VERSION_NAME} — telefon służbowy + podsumowanie rozmów")
 
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Powiązanie pracownika", fontWeight = FontWeight.Bold)
                     Text(status)
+                    Text(
+                        if (app.deviceStore.deviceToken.isNullOrBlank()) {
+                            "Autoryzacja urządzenia: brak tokenu CRM"
+                        } else {
+                            "Autoryzacja urządzenia: aktywna"
+                        },
+                        style = MaterialTheme.typography.bodySmall
+                    )
                     if (detectedPhone.isNotBlank()) Text("Numer: $detectedPhone")
                     if (serviceSimInfo.isNotBlank()) Text(serviceSimInfo, style = MaterialTheme.typography.bodySmall)
                 }
@@ -245,6 +254,7 @@ private fun SetupScreen(
 
                     var matchedCandidate: ServiceSimCandidate? = null
                     var matchedName: String? = null
+                    var matchedTokenPresent = false
                     var lastError: String? = null
 
                     for (candidate in candidates) {
@@ -261,6 +271,7 @@ private fun SetupScreen(
                             if (match.matched) {
                                 matchedCandidate = candidate
                                 matchedName = match.employeeName ?: match.employeeId?.let { "#$it" }
+                                matchedTokenPresent = !match.deviceToken.isNullOrBlank()
                             } else {
                                 lastError = match.message
                             }
@@ -280,7 +291,20 @@ private fun SetupScreen(
                         app.smsProviderScanner.initializeCheckpointToCurrent()
                         SmsSyncScheduler.schedulePeriodic(context)
                         app.ensureSmsObserver()
-                        status = "Połączono z pracownikiem: ${matchedName ?: "przypisany pracownik"}. SMS-y będą synchronizowane tylko z tej karty SIM."
+                        status = if (!matchedTokenPresent) {
+                            "Rozpoznano pracownika: ${matchedName ?: "przypisany pracownik"}, ale CRM nie zwrócił tokenu urządzenia. Parowanie po stronie CRM jest niepełne — dane klientów i Caller ID nie będą dostępne."
+                        } else {
+                            val cacheResult = runCatching { app.repository.syncClientCache() }
+                            refreshCacheStats()
+                            cacheResult.fold(
+                                onSuccess = { downloaded ->
+                                    "Połączono z pracownikiem: ${matchedName ?: "przypisany pracownik"}. Autoryzacja aktywna. Synchronizacja danych klientów: $downloaded rekordów."
+                                },
+                                onFailure = { error ->
+                                    "Urządzenie sparowane, ale CRM nie udostępnił danych klientów: ${error.message ?: error.javaClass.simpleName}"
+                                }
+                            )
+                        }
                     } else {
                         status = lastError ?: "Żaden aktywny numer SIM nie jest przypisany do pracownika w CRM."
                     }
