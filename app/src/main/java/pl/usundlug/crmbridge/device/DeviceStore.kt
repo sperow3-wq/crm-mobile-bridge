@@ -58,6 +58,10 @@ class DeviceStore(context: Context) {
         get() = prefs.getString(KEY_DEVICE_TOKEN, null)
         set(value) = prefs.edit().putString(KEY_DEVICE_TOKEN, value).apply()
 
+    var callerIdEnabled: Boolean
+        get() = prefs.getBoolean(KEY_CALLER_ID_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_CALLER_ID_ENABLED, value).apply()
+
 
     var lastClientId: Long?
         get() = prefs.getLong(KEY_LAST_CLIENT_ID, -1L).takeIf { it > 0L }
@@ -104,6 +108,7 @@ class DeviceStore(context: Context) {
         private const val KEY_SERVICE_SIM_SLOT = "service_sim_slot"
         private const val KEY_SERVICE_CARRIER = "service_carrier"
         private const val KEY_DEVICE_TOKEN = "device_token"
+        private const val KEY_CALLER_ID_ENABLED = "caller_id_enabled"
         private const val KEY_LAST_INBOX_SMS_PROVIDER_ID = "last_inbox_sms_provider_id"
         private const val KEY_LAST_SENT_SMS_PROVIDER_ID = "last_sent_sms_provider_id"
         private const val KEY_LAST_CLIENT_ID = "last_client_id"
