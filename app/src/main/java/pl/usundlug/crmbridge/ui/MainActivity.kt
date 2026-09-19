@@ -127,14 +127,26 @@ private fun SetupScreen(
     }
 
     LaunchedEffect(Unit) {
-        refreshSyncCounters()
-        refreshCacheStats()
-        lastClientId = app.deviceStore.lastClientId
-        lastClientName = app.deviceStore.lastClientName
-        pendingWrapUps = app.callWrapUpStore.count()
         while (true) {
-            delay(1500)
+            refreshSyncCounters()
+            refreshCacheStats()
+            lastClientId = app.deviceStore.lastClientId
+            lastClientName = app.deviceStore.lastClientName
             pendingWrapUps = app.callWrapUpStore.count()
+            detectedPhone = app.deviceStore.servicePhone.orEmpty()
+            serviceSimInfo = formatServiceSimInfo(
+                app.deviceStore.serviceSimSlotIndex,
+                app.deviceStore.serviceCarrierName,
+                app.deviceStore.serviceSubscriptionId
+            )
+            callerIdEnabled = app.deviceStore.callerIdEnabled
+            callScreeningRoleHeld = isCallScreeningRoleHeld()
+            authStatus = if (app.deviceStore.deviceToken.isNullOrBlank()) {
+                "Autoryzacja urządzenia: brak tokenu CRM"
+            } else {
+                "Autoryzacja urządzenia: aktywna"
+            }
+            delay(500)
         }
     }
 
