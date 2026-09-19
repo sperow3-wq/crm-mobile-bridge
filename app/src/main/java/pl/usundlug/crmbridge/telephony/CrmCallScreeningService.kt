@@ -59,7 +59,7 @@ class CrmCallScreeningService : CallScreeningService() {
             // cache already knows this number, show it immediately and refresh CRM in
             // the background. This avoids Android showing only the raw phone number.
             val cached = app.clientCacheStore.find(number)
-            if (incoming && cached != null) {
+            if (incoming && app.deviceStore.callerIdEnabled && cached != null) {
                 showCallerId(app, number, cached, null)
             }
 
@@ -106,7 +106,7 @@ class CrmCallScreeningService : CallScreeningService() {
             // If there was no cached match, show the network result as soon as it is
             // available. When cache was already shown, the fresh result is stored by
             // identifyClient() and will be used immediately on the next call.
-            if (incoming && cached == null) {
+            if (incoming && app.deviceStore.callerIdEnabled && cached == null) {
                 showCallerId(app, number, client, lookupError)
             }
         }
