@@ -56,6 +56,7 @@ class CrmRepository(
             deviceStore.serviceCarrierName = carrierName
             deviceStore.deviceToken = match.deviceToken
             if (!match.deviceToken.isNullOrBlank()) {
+                clientCache.clearAll()
                 ClientCacheScheduler.schedulePeriodic(appContext)
                 ClientCacheScheduler.requestNow(appContext)
             }
