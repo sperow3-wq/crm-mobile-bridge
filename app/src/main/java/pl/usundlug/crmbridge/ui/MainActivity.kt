@@ -330,7 +330,12 @@ private fun SetupScreen(
                             "Rozpoznano pracownika: ${matchedName ?: "przypisany pracownik"}, ale CRM nie zwrócił tokenu urządzenia. Parowanie po stronie CRM jest niepełne — dane klientów i Caller ID nie będą dostępne."
                         } else {
                             authStatus = "Autoryzacja urządzenia: aktywna — potwierdzona przez CRM"
-                            val cacheResult = runCatching { app.repository.syncClientCache() }
+                            cacheSyncInProgress = true
+                            val cacheResult = try {
+                                runCatching { app.repository.syncClientCache() }
+                            } finally {
+                                cacheSyncInProgress = false
+                            }
                             refreshCacheStats()
                             cacheResult.fold(
                                 onSuccess = { downloaded ->
@@ -420,7 +425,12 @@ private fun SetupScreen(
             OutlinedButton(onClick = {
                 scope.launch {
                     status = "Aktualizuję zaszyfrowaną bazę klientów…"
-                    val result = runCatching { app.repository.syncClientCache() }
+                    cacheSyncInProgress = true
+                    val result = try {
+                        runCatching { app.repository.syncClientCache() }
+                    } finally {
+                        cacheSyncInProgress = false
+                    }
                     status = result.fold(
                         onSuccess = { "Baza offline zaktualizowana. Pobrano/zmieniono rekordów: $it" },
                         onFailure = { "Nie udało się odświeżyć bazy offline: ${it.message ?: it.javaClass.simpleName}" }
