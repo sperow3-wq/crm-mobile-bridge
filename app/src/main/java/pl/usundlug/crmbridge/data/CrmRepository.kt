@@ -85,10 +85,11 @@ class CrmRepository(
 
             if (match.matched) {
                 clientCache.put(match, match.dataUpdatedAtEpochMs ?: System.currentTimeMillis())
-            } else {
-                // A successful server response saying "not found" invalidates an old mapping.
-                clientCache.remove(phone)
             }
+            // Do not delete a fresh local mapping merely because one live lookup did
+            // not resolve. Duplicate/imported CRM records can be reconciled by the
+            // next cache sync; keeping the cache prevents Caller ID from disappearing
+            // between calls.
             match
         } catch (networkError: Exception) {
             clientCache.find(phone) ?: throw networkError
