@@ -71,6 +71,7 @@ class CallerIdActivity : ComponentActivity() {
         val currency = intent.getStringExtra(EXTRA_CURRENCY) ?: "PLN"
         val dataSource = intent.getStringExtra(EXTRA_DATA_SOURCE).orEmpty()
         val dataUpdatedAt = intent.getLongExtra(EXTRA_DATA_UPDATED_AT, 0L)
+        val lookupError = intent.getStringExtra(EXTRA_LOOKUP_ERROR).orEmpty()
 
         setContent {
             MaterialTheme {
@@ -86,6 +87,7 @@ class CallerIdActivity : ComponentActivity() {
                     currency = currency,
                     offlineData = dataSource == "CACHE",
                     dataUpdatedAtEpochMs = dataUpdatedAt,
+                    lookupError = lookupError,
                     canOpenHistory = clientId != null,
                     onOpenHistory = { clientId?.let(::openClientHistory) }
                 )
@@ -142,6 +144,7 @@ class CallerIdActivity : ComponentActivity() {
         const val EXTRA_CURRENCY = "currency"
         const val EXTRA_DATA_SOURCE = "data_source"
         const val EXTRA_DATA_UPDATED_AT = "data_updated_at"
+        const val EXTRA_LOOKUP_ERROR = "lookup_error"
         const val ACTION_CLOSE_CALLER_ID = "pl.usundlug.crmbridge.CLOSE_CALLER_ID"
     }
 }
@@ -159,6 +162,7 @@ private fun CallerIdScreen(
     currency: String,
     offlineData: Boolean,
     dataUpdatedAtEpochMs: Long,
+    lookupError: String,
     canOpenHistory: Boolean,
     onOpenHistory: () -> Unit
 ) {
@@ -243,7 +247,20 @@ private fun CallerIdScreen(
                 } else {
                     Text(phone, color = Color.White.copy(alpha = 0.75f), fontSize = 18.sp)
                     Spacer(Modifier.height(8.dp))
-                    Text("Numer nie występuje w CRM", color = Color.White.copy(alpha = 0.65f), fontSize = 16.sp)
+                    Text(
+                        if (lookupError.isNotBlank()) "Nie udało się pobrać danych klienta z CRM" else "Numer nie występuje w CRM",
+                        color = Color.White.copy(alpha = 0.65f),
+                        fontSize = 16.sp
+                    )
+                    if (lookupError.isNotBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            lookupError.take(180),
+                            color = Color.White.copy(alpha = 0.50f),
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
 
                 Spacer(Modifier.weight(1f))
