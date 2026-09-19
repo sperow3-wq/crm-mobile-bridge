@@ -75,6 +75,18 @@ class DeviceStore(context: Context) {
         get() = prefs.getString(KEY_LAST_CLIENT_NAME, null)
         set(value) = prefs.edit().putString(KEY_LAST_CLIENT_NAME, value).apply()
 
+    var lastIncomingPhone: String?
+        get() = prefs.getString(KEY_LAST_INCOMING_PHONE, null)
+        set(value) = prefs.edit().putString(KEY_LAST_INCOMING_PHONE, value).apply()
+
+    var lastCallerIdStatus: String?
+        get() = prefs.getString(KEY_LAST_CALLER_ID_STATUS, null)
+        set(value) = prefs.edit().putString(KEY_LAST_CALLER_ID_STATUS, value).apply()
+
+    var lastCallerIdAtEpochMs: Long
+        get() = prefs.getLong(KEY_LAST_CALLER_ID_AT, 0L)
+        set(value) = prefs.edit().putLong(KEY_LAST_CALLER_ID_AT, value.coerceAtLeast(0L)).apply()
+
     var lastSyncedInboxSmsProviderId: Long
         get() = prefs.getLong(KEY_LAST_INBOX_SMS_PROVIDER_ID, 0L)
         set(value) = prefs.edit().putLong(KEY_LAST_INBOX_SMS_PROVIDER_ID, value.coerceAtLeast(0L)).apply()
@@ -113,5 +125,8 @@ class DeviceStore(context: Context) {
         private const val KEY_LAST_SENT_SMS_PROVIDER_ID = "last_sent_sms_provider_id"
         private const val KEY_LAST_CLIENT_ID = "last_client_id"
         private const val KEY_LAST_CLIENT_NAME = "last_client_name"
+        private const val KEY_LAST_INCOMING_PHONE = "last_incoming_phone"
+        private const val KEY_LAST_CALLER_ID_STATUS = "last_caller_id_status"
+        private const val KEY_LAST_CALLER_ID_AT = "last_caller_id_at"
     }
 }
