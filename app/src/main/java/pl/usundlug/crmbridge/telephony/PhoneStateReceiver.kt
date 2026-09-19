@@ -26,13 +26,13 @@ class PhoneStateReceiver : BroadcastReceiver() {
         // in-call UI is unobstructed. The activity also closes on IDLE.
         if (state == TelephonyManager.EXTRA_STATE_OFFHOOK) {
             context.sendBroadcast(Intent(CallerIdActivity.ACTION_CLOSE_CALLER_ID).setPackage(context.packageName))
-        CallerIdNotifier.cancel(context)
             CallerIdNotifier.cancel(context)
             return
         }
 
         if (state != TelephonyManager.EXTRA_STATE_IDLE) return
         context.sendBroadcast(Intent(CallerIdActivity.ACTION_CLOSE_CALLER_ID).setPackage(context.packageName))
+        CallerIdNotifier.cancel(context)
 
         val pendingResult = goAsync()
         scope.launch {
