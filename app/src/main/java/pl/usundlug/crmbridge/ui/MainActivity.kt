@@ -115,6 +115,9 @@ private fun SetupScreen(
     var callerIdEnabled by remember { mutableStateOf(app.deviceStore.callerIdEnabled) }
     var callScreeningRoleHeld by remember { mutableStateOf(isCallScreeningRoleHeld()) }
     var cacheSyncInProgress by remember { mutableStateOf(false) }
+    var lastIncomingPhone by remember { mutableStateOf(app.deviceStore.lastIncomingPhone) }
+    var lastCallerIdStatus by remember { mutableStateOf(app.deviceStore.lastCallerIdStatus) }
+    var lastCallerIdAt by remember { mutableStateOf(app.deviceStore.lastCallerIdAtEpochMs) }
 
     fun refreshSyncCounters() {
         pendingSync = app.syncQueueStore.countPending()
@@ -141,6 +144,9 @@ private fun SetupScreen(
             )
             callerIdEnabled = app.deviceStore.callerIdEnabled
             callScreeningRoleHeld = isCallScreeningRoleHeld()
+            lastIncomingPhone = app.deviceStore.lastIncomingPhone
+            lastCallerIdStatus = app.deviceStore.lastCallerIdStatus
+            lastCallerIdAt = app.deviceStore.lastCallerIdAtEpochMs
             authStatus = if (app.deviceStore.deviceToken.isNullOrBlank()) {
                 "Autoryzacja urządzenia: brak tokenu CRM"
             } else {
@@ -386,6 +392,32 @@ private fun SetupScreen(
                                 requestCallScreeningRole()
                             }
                         }
+                    )
+                }
+            }
+
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Diagnostyka Caller ID", fontWeight = FontWeight.Bold)
+                    Text(
+                        if (lastIncomingPhone.isNullOrBlank()) {
+                            "Aplikacja nie zarejestrowała jeszcze połączenia przychodzącego."
+                        } else {
+                            "Ostatni numer: $lastIncomingPhone"
+                        }
+                    )
+                    lastCallerIdStatus?.takeIf { it.isNotBlank() }?.let {
+                        Text("Wynik: $it", style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (lastCallerIdAt > 0L) {
+                        Text(
+                            "Ostatnie zdarzenie: ${formatUiDateTime(lastCallerIdAt)}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Text(
+                        "Ta sekcja pokazuje, czy Android przekazał numer do Mobile Bridge i czy klient został znaleziony w cache lub CRM.",
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
