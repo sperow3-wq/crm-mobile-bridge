@@ -6,6 +6,7 @@ import java.security.KeyStore
 import javax.crypto.KeyGenerator
 import javax.crypto.Mac
 import javax.crypto.SecretKey
+import pl.usundlug.crmbridge.util.PhoneNumberNormalizer
 
 /**
  * Creates a deterministic local lookup key without storing the phone number or an
@@ -15,9 +16,10 @@ internal class PhoneLookupKey {
     private val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
 
     fun forPhone(normalizedPhone: String): String {
+        val canonical = PhoneNumberNormalizer.normalizePolish(normalizedPhone) ?: normalizedPhone.trim()
         val mac = Mac.getInstance(ALGORITHM)
         mac.init(getOrCreateKey())
-        return mac.doFinal(normalizedPhone.toByteArray(Charsets.UTF_8))
+        return mac.doFinal(canonical.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it.toInt() and 0xff) }
     }
 
