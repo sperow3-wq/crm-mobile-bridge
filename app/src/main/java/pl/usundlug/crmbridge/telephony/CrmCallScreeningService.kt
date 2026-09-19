@@ -54,8 +54,10 @@ class CrmCallScreeningService : CallScreeningService() {
         )
 
         scope.launch {
+            var lookupError: String? = null
             val client = runCatching { app.repository.identifyClient(number) }
-                .getOrElse {
+                .getOrElse { error ->
+                    lookupError = error.message ?: error.javaClass.simpleName
                     ClientMatch(
                         matched = false,
                         normalizedPhone = number
@@ -87,12 +89,12 @@ class CrmCallScreeningService : CallScreeningService() {
             }
 
             if (incoming) {
-                showCallerId(app, number, client)
+                showCallerId(app, number, client, lookupError)
             }
         }
     }
 
-    private fun showCallerId(app: CrmBridgeApp, number: String, client: ClientMatch) {
+    private fun showCallerId(app: CrmBridgeApp, number: String, client: ClientMatch, lookupError: String?) {
         val intent = Intent(this, CallerIdActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra(CallerIdActivity.EXTRA_PHONE, number)
@@ -110,6 +112,7 @@ class CrmCallScreeningService : CallScreeningService() {
             putExtra(CallerIdActivity.EXTRA_CURRENCY, client.currency)
             putExtra(CallerIdActivity.EXTRA_DATA_SOURCE, client.dataSource.name)
             putExtra(CallerIdActivity.EXTRA_DATA_UPDATED_AT, client.dataUpdatedAtEpochMs ?: 0L)
+            putExtra(CallerIdActivity.EXTRA_LOOKUP_ERROR, lookupError.orEmpty())
         }
         startActivity(intent)
     }
