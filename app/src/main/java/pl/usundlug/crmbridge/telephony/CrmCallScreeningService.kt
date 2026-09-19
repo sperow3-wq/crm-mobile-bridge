@@ -11,6 +11,7 @@ import pl.usundlug.crmbridge.CrmBridgeApp
 import pl.usundlug.crmbridge.data.CallDirection
 import pl.usundlug.crmbridge.data.ClientMatch
 import pl.usundlug.crmbridge.data.CallSession
+import pl.usundlug.crmbridge.notifications.CallerIdNotifier
 import pl.usundlug.crmbridge.ui.CallerIdActivity
 import pl.usundlug.crmbridge.util.PhoneNumberNormalizer
 import java.util.UUID
@@ -54,8 +55,16 @@ class CrmCallScreeningService : CallScreeningService() {
         )
 
         scope.launch {
+            // Caller ID during ringing must not wait for the network. If the encrypted
+            // cache already knows this number, show it immediately and refresh CRM in
+            // the background. This avoids Android showing only the raw phone number.
+            val cached = app.clientCacheStore.find(number)
+            if (incoming && cached != null) {
+                showCallerId(app, number, cached, null)
+            }
+
             var lookupError: String? = null
-            val client = runCatching { app.repository.identifyClient(number) }
+            val fresh = runCatching { app.repository.identifyClient(number) }
                 .getOrElse { error ->
                     lookupError = error.message ?: error.javaClass.simpleName
                     ClientMatch(
@@ -63,6 +72,12 @@ class CrmCallScreeningService : CallScreeningService() {
                         normalizedPhone = number
                     )
                 }
+
+            val client = when {
+                fresh.matched -> fresh
+                cached != null -> cached
+                else -> fresh
+            }
 
             if (client.matched && client.clientId != null) {
                 app.deviceStore.lastClientId = client.clientId
@@ -88,7 +103,10 @@ class CrmCallScreeningService : CallScreeningService() {
                 )
             }
 
-            if (incoming) {
+            // If there was no cached match, show the network result as soon as it is
+            // available. When cache was already shown, the fresh result is stored by
+            // identifyClient() and will be used immediately on the next call.
+            if (incoming && cached == null) {
                 showCallerId(app, number, client, lookupError)
             }
         }
@@ -114,6 +132,27 @@ class CrmCallScreeningService : CallScreeningService() {
             putExtra(CallerIdActivity.EXTRA_DATA_UPDATED_AT, client.dataUpdatedAtEpochMs ?: 0L)
             putExtra(CallerIdActivity.EXTRA_LOOKUP_ERROR, lookupError.orEmpty())
         }
-        startActivity(intent)
+        val title = if (client.matched) {
+            client.clientName ?: "Klient CRM"
+        } else {
+            "Połączenie przychodzące"
+        }
+        val text = if (client.matched) {
+            listOfNotNull(
+                client.product?.takeIf { it.isNotBlank() },
+                client.stage?.takeIf { it.isNotBlank() }
+            ).joinToString(" • ").ifBlank { number }
+        } else {
+            number
+        }
+
+        // Full-screen call notification is the supported path on modern Android.
+        // It can open CallerIdActivity over the lock screen; if the OEM suppresses
+        // the full-screen launch, the user still gets a high-priority heads-up card.
+        CallerIdNotifier.show(this, intent, title, text)
+
+        // On devices that still allow background activity starts from the call
+        // screening role, this gives the fastest possible display.
+        runCatching { startActivity(intent) }
     }
 }
