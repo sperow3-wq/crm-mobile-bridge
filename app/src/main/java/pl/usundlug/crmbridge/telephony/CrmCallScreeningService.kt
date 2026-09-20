@@ -112,10 +112,10 @@ class CrmCallScreeningService : CallScreeningService() {
                 )
             }
 
-            // If there was no cached match, show the network result as soon as it is
-            // available. When cache was already shown, the fresh result is stored by
-            // identifyClient() and will be used immediately on the next call.
-            if (incoming && app.deviceStore.callerIdEnabled && cached == null) {
+            // Cache can be shown immediately, but the live CRM response always
+            // replaces it on the same caller card. This keeps stage/payment data
+            // current without waiting for the next call.
+            if (incoming && app.deviceStore.callerIdEnabled) {
                 CallerIdPresenter.show(this@CrmCallScreeningService, app, number, client, lookupError)
             }
         }
