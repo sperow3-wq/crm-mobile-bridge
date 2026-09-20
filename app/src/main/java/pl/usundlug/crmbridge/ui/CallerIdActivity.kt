@@ -48,6 +48,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import pl.usundlug.crmbridge.CrmBridgeApp
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Currency
@@ -68,6 +72,36 @@ class CallerIdActivity : ComponentActivity() {
         setShowWhenLocked(true)
         setTurnScreenOn(true)
         uiState.value = readUiState(intent)
+
+        val app = application as CrmBridgeApp
+        lifecycleScope.launch {
+            while (true) {
+                if (!app.deviceStore.callerCardRinging) {
+                    finish()
+                    break
+                }
+                val phone = uiState.value.phone
+                if (phone.isNotBlank()) {
+                    app.clientCacheStore.find(phone)?.let { cached ->
+                        uiState.value = uiState.value.copy(
+                            clientId = cached.clientId,
+                            name = cached.clientName ?: uiState.value.name,
+                            product = cached.product.orEmpty(),
+                            stage = cached.stage.orEmpty(),
+                            guardian = cached.guardianName.orEmpty(),
+                            matched = cached.matched,
+                            overdueCount = cached.overdueInvoicesCount,
+                            overdueAmount = cached.overdueAmount,
+                            currency = cached.currency,
+                            offlineData = cached.isOfflineCache,
+                            dataUpdatedAtEpochMs = cached.dataUpdatedAtEpochMs ?: uiState.value.dataUpdatedAtEpochMs,
+                            lookupError = ""
+                        )
+                    }
+                }
+                delay(300)
+            }
+        }
 
         setContent {
             MaterialTheme {
@@ -122,6 +156,9 @@ class CallerIdActivity : ComponentActivity() {
 
     @Suppress("DEPRECATION")
     private fun answerIncomingCall() {
+        val app = application as CrmBridgeApp
+        app.callSessionStore.markAnswered()
+        app.deviceStore.callerCardRinging = false
         val telecom = getSystemService(TelecomManager::class.java)
         val granted = ContextCompat.checkSelfPermission(
             this,
@@ -147,6 +184,9 @@ class CallerIdActivity : ComponentActivity() {
 
     @Suppress("DEPRECATION")
     private fun rejectIncomingCall() {
+        val app = application as CrmBridgeApp
+        app.callSessionStore.markRejectedByApp()
+        app.deviceStore.callerCardRinging = false
         val telecom = getSystemService(TelecomManager::class.java)
         val granted = ContextCompat.checkSelfPermission(
             this,
