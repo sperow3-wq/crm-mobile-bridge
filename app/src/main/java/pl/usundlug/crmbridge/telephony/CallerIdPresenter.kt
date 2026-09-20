@@ -2,6 +2,7 @@ package pl.usundlug.crmbridge.telephony
 
 import android.content.Context
 import android.content.Intent
+import android.telecom.Call
 import pl.usundlug.crmbridge.CrmBridgeApp
 import pl.usundlug.crmbridge.data.ClientMatch
 import pl.usundlug.crmbridge.notifications.CallerIdNotifier
@@ -39,10 +40,17 @@ object CallerIdPresenter {
             putExtra(CallerIdActivity.EXTRA_DATA_SOURCE, client.dataSource.name)
             putExtra(CallerIdActivity.EXTRA_DATA_UPDATED_AT, client.dataUpdatedAtEpochMs ?: 0L)
             putExtra(CallerIdActivity.EXTRA_LOOKUP_ERROR, lookupError.orEmpty())
-            putExtra(CallerIdActivity.EXTRA_CALL_STATE, ActiveCallRegistry.state)
+            val defaultDialer = DialerRole.isHeld(context)
+            putExtra(
+                CallerIdActivity.EXTRA_CALL_STATE,
+                if (defaultDialer) ActiveCallRegistry.state else Call.STATE_RINGING
+            )
             putExtra(CallerIdActivity.EXTRA_MUTED, ActiveCallRegistry.muted)
             putExtra(CallerIdActivity.EXTRA_SPEAKER, ActiveCallRegistry.speaker)
-            putExtra(CallerIdActivity.EXTRA_INCOMING, ActiveCallRegistry.incoming)
+            putExtra(
+                CallerIdActivity.EXTRA_INCOMING,
+                if (defaultDialer) ActiveCallRegistry.incoming else true
+            )
         }
 
         val title = if (client.matched) {
