@@ -59,7 +59,8 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 SetupScreen(
                     app = app,
-                    requestCallScreeningRole = { requestCallScreeningRole() }
+                    requestCallScreeningRole = { requestCallScreeningRole() },
+                    requestDialerRole = { requestDialerRole() }
                 )
             }
         }
@@ -73,12 +74,22 @@ class MainActivity : ComponentActivity() {
             startActivity(roleManager.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING))
         }
     }
+
+    private fun requestDialerRole() {
+        val roleManager = getSystemService(RoleManager::class.java) ?: return
+        if (roleManager.isRoleAvailable(RoleManager.ROLE_DIALER) &&
+            !roleManager.isRoleHeld(RoleManager.ROLE_DIALER)
+        ) {
+            startActivity(roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER))
+        }
+    }
 }
 
 @Composable
 private fun SetupScreen(
     app: CrmBridgeApp,
-    requestCallScreeningRole: () -> Unit
+    requestCallScreeningRole: () -> Unit,
+    requestDialerRole: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -87,6 +98,12 @@ private fun SetupScreen(
         val roleManager = context.getSystemService(RoleManager::class.java) ?: return false
         return roleManager.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING) &&
             roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
+    }
+
+    fun isDialerRoleHeld(): Boolean {
+        val roleManager = context.getSystemService(RoleManager::class.java) ?: return false
+        return roleManager.isRoleAvailable(RoleManager.ROLE_DIALER) &&
+            roleManager.isRoleHeld(RoleManager.ROLE_DIALER)
     }
     var status by remember {
         mutableStateOf(
@@ -114,6 +131,7 @@ private fun SetupScreen(
     var pendingWrapUps by remember { mutableStateOf(app.callWrapUpStore.count()) }
     var callerIdEnabled by remember { mutableStateOf(app.deviceStore.callerIdEnabled) }
     var callScreeningRoleHeld by remember { mutableStateOf(isCallScreeningRoleHeld()) }
+    var dialerRoleHeld by remember { mutableStateOf(isDialerRoleHeld()) }
     var cacheSyncInProgress by remember { mutableStateOf(false) }
     var lastIncomingPhone by remember { mutableStateOf(app.deviceStore.lastIncomingPhone) }
     var lastCallerIdStatus by remember { mutableStateOf(app.deviceStore.lastCallerIdStatus) }
@@ -144,6 +162,7 @@ private fun SetupScreen(
             )
             callerIdEnabled = app.deviceStore.callerIdEnabled
             callScreeningRoleHeld = isCallScreeningRoleHeld()
+            dialerRoleHeld = isDialerRoleHeld()
             lastIncomingPhone = app.deviceStore.lastIncomingPhone
             lastCallerIdStatus = app.deviceStore.lastCallerIdStatus
             lastCallerIdAt = app.deviceStore.lastCallerIdAtEpochMs
@@ -273,6 +292,7 @@ private fun SetupScreen(
                         Manifest.permission.READ_PHONE_STATE,
                         Manifest.permission.READ_PHONE_NUMBERS,
                         Manifest.permission.ANSWER_PHONE_CALLS,
+                        Manifest.permission.CALL_PHONE,
                         Manifest.permission.READ_CONTACTS,
                         Manifest.permission.READ_CALL_LOG,
                         Manifest.permission.READ_SMS,
@@ -360,6 +380,27 @@ private fun SetupScreen(
                 }
             }) {
                 Text("2. Sparuj telefon z CRM")
+            }
+
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Własny ekran połączenia CRM", fontWeight = FontWeight.Bold)
+                    Text(
+                        if (dialerRoleHeld) {
+                            "Aktywny. CRM Mobile Bridge zastępuje systemowy ekran telefonu podczas połączenia."
+                        } else {
+                            "Aby używać własnego Caller ID także po odebraniu rozmowy, ustaw CRM Mobile Bridge jako domyślną aplikację Telefon."
+                        },
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    if (!dialerRoleHeld) {
+                        Button(onClick = requestDialerRole) {
+                            Text("3. Ustaw jako domyślny Telefon")
+                        }
+                    } else {
+                        Text("✓ Domyślna aplikacja Telefon: CRM Mobile Bridge", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
 
             Card(Modifier.fillMaxWidth()) {
