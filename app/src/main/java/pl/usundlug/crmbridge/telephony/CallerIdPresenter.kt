@@ -58,6 +58,10 @@ object CallerIdPresenter {
             number
         }
 
+        // Never refresh or resurrect the caller UI after the call has already
+        // been rejected or disconnected.
+        if (!app.deviceStore.callerCardRinging && !ActiveCallRegistry.hasCall()) return
+
         // Always refresh an already visible caller card directly. This avoids
         // relying on Activity recreation/orientation changes for new CRM data.
         context.sendBroadcast(
@@ -65,10 +69,6 @@ object CallerIdPresenter {
                 .setPackage(context.packageName)
                 .putExtras(intent.extras ?: android.os.Bundle())
         )
-
-        // Never resurrect the caller UI after the call has already been answered,
-        // rejected or disconnected.
-        if (!app.deviceStore.callerCardRinging) return
 
         CallerIdNotifier.show(context, intent, title, text)
         runCatching { context.startActivity(intent) }
