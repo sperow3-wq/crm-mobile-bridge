@@ -10,8 +10,8 @@ import pl.usundlug.crmbridge.ui.CallerIdActivity
 /**
  * One presentation path for both CallScreeningService and the PHONE_STATE fallback.
  * Using a high-priority full-screen notification plus an activity start gives us the
- * best chance of showing CRM data on Samsung/OEM dialers without becoming the default
- * phone app.
+ * fallback path for normal caller screening and the presentation path used by the
+ * custom default-dialer InCallService.
  */
 object CallerIdPresenter {
     fun show(
@@ -39,6 +39,9 @@ object CallerIdPresenter {
             putExtra(CallerIdActivity.EXTRA_DATA_SOURCE, client.dataSource.name)
             putExtra(CallerIdActivity.EXTRA_DATA_UPDATED_AT, client.dataUpdatedAtEpochMs ?: 0L)
             putExtra(CallerIdActivity.EXTRA_LOOKUP_ERROR, lookupError.orEmpty())
+            putExtra(CallerIdActivity.EXTRA_CALL_STATE, ActiveCallRegistry.state)
+            putExtra(CallerIdActivity.EXTRA_MUTED, ActiveCallRegistry.muted)
+            putExtra(CallerIdActivity.EXTRA_SPEAKER, ActiveCallRegistry.speaker)
         }
 
         val title = if (client.matched) {
