@@ -23,10 +23,15 @@ object ActiveCallRegistry {
     var speaker: Boolean = false
         private set
 
+    @Volatile
+    var incoming: Boolean = true
+        private set
+
     fun attach(service: CrmInCallService, call: Call) {
         currentService = service
         currentCall = call
         state = call.state
+        incoming = call.details.callDirection != Call.Details.DIRECTION_OUTGOING
     }
 
     fun update(call: Call, newState: Int) {
@@ -43,10 +48,13 @@ object ActiveCallRegistry {
             state = Call.STATE_DISCONNECTED
             muted = false
             speaker = false
+            incoming = true
         }
     }
 
     fun hasCall(): Boolean = currentCall != null
+
+    fun isCurrent(call: Call): Boolean = currentCall === call
 
     fun answer(): Boolean = runCatching {
         val call = currentCall ?: return false
