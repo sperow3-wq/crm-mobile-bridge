@@ -27,6 +27,11 @@ class PhoneStateReceiver : BroadcastReceiver() {
         val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE) ?: return
         val app = context.applicationContext as CrmBridgeApp
 
+        // When CRM Mobile Bridge is the default Phone app, CrmInCallService owns
+        // the entire call lifecycle and custom UI. The legacy PHONE_STATE path stays
+        // only as a fallback when the user has not granted the dialer role.
+        if (DialerRole.isHeld(context)) return
+
         if (state == TelephonyManager.EXTRA_STATE_RINGING) {
             app.deviceStore.callerCardRinging = true
             val rawNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
