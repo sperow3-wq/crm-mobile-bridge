@@ -217,7 +217,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
                         app.callWrapUpStore.save(completed)
                         app.postCallNotifier.show(completed)
                     }
-                    app.callSessionStore.clear()
+                    app.callSessionStore.clearIf(session.eventUuid)
                 }
             } finally {
                 pendingResult.finish()
