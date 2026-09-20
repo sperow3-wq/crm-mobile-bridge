@@ -71,7 +71,9 @@ object CallerIdPresenter {
                 .putExtras(intent.extras ?: android.os.Bundle())
         )
 
-        CallerIdNotifier.show(context, intent, title, text)
+        if (!DialerRole.isHeld(context)) {
+            CallerIdNotifier.show(context, intent, title, text)
+        }
         runCatching { context.startActivity(intent) }
     }
 }
