@@ -1,5 +1,6 @@
 package pl.usundlug.crmbridge.ui
 
+import android.Manifest
 import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -7,6 +8,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
+import android.telecom.TelecomManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -24,9 +26,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.CallEnd
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Currency
@@ -79,7 +86,9 @@ class CallerIdActivity : ComponentActivity() {
                     dataUpdatedAtEpochMs = state.dataUpdatedAtEpochMs,
                     lookupError = state.lookupError,
                     canOpenHistory = state.clientId != null,
-                    onOpenHistory = { state.clientId?.let(::openClientHistory) }
+                    onOpenHistory = { state.clientId?.let(::openClientHistory) },
+                    onAnswer = { answerIncomingCall() },
+                    onReject = { rejectIncomingCall() }
                 )
             }
         }
@@ -109,6 +118,59 @@ class CallerIdActivity : ComponentActivity() {
             dataUpdatedAtEpochMs = intent.getLongExtra(EXTRA_DATA_UPDATED_AT, 0L),
             lookupError = intent.getStringExtra(EXTRA_LOOKUP_ERROR).orEmpty()
         )
+    }
+
+    @Suppress("DEPRECATION")
+    private fun answerIncomingCall() {
+        val telecom = getSystemService(TelecomManager::class.java)
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ANSWER_PHONE_CALLS
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (!granted || telecom == null) {
+            showNativeCallScreen()
+            return
+        }
+
+        val accepted = runCatching {
+            telecom.acceptRingingCall()
+            true
+        }.getOrDefault(false)
+
+        if (accepted) {
+            finish()
+        } else {
+            showNativeCallScreen()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun rejectIncomingCall() {
+        val telecom = getSystemService(TelecomManager::class.java)
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ANSWER_PHONE_CALLS
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (!granted || telecom == null) {
+            showNativeCallScreen()
+            return
+        }
+
+        val ended = runCatching { telecom.endCall() }.getOrDefault(false)
+        if (ended) {
+            finish()
+        } else {
+            showNativeCallScreen()
+        }
+    }
+
+    private fun showNativeCallScreen() {
+        runCatching {
+            getSystemService(TelecomManager::class.java)?.showInCallScreen(false)
+        }
+        finish()
     }
 
     private fun openClientHistory(clientId: Long) {
@@ -196,7 +258,9 @@ private fun CallerIdScreen(
     dataUpdatedAtEpochMs: Long,
     lookupError: String,
     canOpenHistory: Boolean,
-    onOpenHistory: () -> Unit
+    onOpenHistory: () -> Unit,
+    onAnswer: () -> Unit,
+    onReject: () -> Unit
 ) {
     val top = Color(0xFF14283A)
     val bottom = Color(0xFF050B12)
@@ -263,6 +327,38 @@ private fun CallerIdScreen(
 
                     Spacer(Modifier.height(24.dp))
                     FinancialStatus(overdueCount, overdueAmount, currency)
+
+                    Spacer(Modifier.height(18.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = onReject,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFB3261E),
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(Icons.Rounded.CallEnd, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Odrzuć", fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = onAnswer,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF1E8E3E),
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(Icons.Rounded.Call, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Odbierz", fontWeight = FontWeight.Bold)
+                        }
+                    }
 
                     if (canOpenHistory) {
                         Spacer(Modifier.height(14.dp))
