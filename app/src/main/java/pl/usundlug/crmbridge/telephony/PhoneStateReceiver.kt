@@ -10,11 +10,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import pl.usundlug.crmbridge.CrmBridgeApp
+import pl.usundlug.crmbridge.data.CallDirection
+import pl.usundlug.crmbridge.data.CallSession
 import pl.usundlug.crmbridge.data.CompletedCallContext
 import pl.usundlug.crmbridge.data.ResolvedCall
 import pl.usundlug.crmbridge.notifications.CallerIdNotifier
 import pl.usundlug.crmbridge.ui.CallerIdActivity
 import pl.usundlug.crmbridge.util.PhoneNumberNormalizer
+import java.util.UUID
 
 class PhoneStateReceiver : BroadcastReceiver() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -36,6 +39,38 @@ class PhoneStateReceiver : BroadcastReceiver() {
 
             app.deviceStore.lastIncomingPhone = number
             app.deviceStore.lastCallerIdAtEpochMs = System.currentTimeMillis()
+
+            // PHONE_STATE is the fallback path on Samsung devices where the screening
+            // callback can be late or absent. Ensure a durable call session exists
+            // before any UI/network work so the call can always be finalized at IDLE.
+            val now = System.currentTimeMillis()
+            val existingSession = app.callSessionStore.current()
+            val session = existingSession?.takeIf {
+                it.phone == number &&
+                    it.direction == CallDirection.INCOMING &&
+                    kotlin.math.abs(it.startedAtEpochMs - now) <= 20_000L
+            } ?: CallSession(
+                eventUuid = UUID.randomUUID().toString(),
+                clientId = null,
+                phone = number,
+                direction = CallDirection.INCOMING,
+                startedAtEpochMs = now
+            ).also(app.callSessionStore::save)
+
+            val startPending = goAsync()
+            scope.launch {
+                try {
+                    app.repository.sendCallStarted(
+                        phone = number,
+                        direction = CallDirection.INCOMING,
+                        clientId = session.clientId,
+                        eventUuid = session.eventUuid,
+                        startedAtEpochMs = session.startedAtEpochMs
+                    )
+                } finally {
+                    startPending.finish()
+                }
+            }
 
             if (!app.deviceStore.callerIdEnabled) {
                 app.deviceStore.lastCallerIdStatus = "RINGING: identyfikacja wyłączona"
