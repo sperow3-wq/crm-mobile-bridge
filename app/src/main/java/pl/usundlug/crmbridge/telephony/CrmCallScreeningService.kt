@@ -32,6 +32,10 @@ class CrmCallScreeningService : CallScreeningService() {
             )
         }
 
+        // Default-dialer mode has its own InCallService and must not start a second
+        // caller activity or create a parallel call session.
+        if (DialerRole.isHeld(this)) return
+
         val rawNumber = callDetails.handle?.schemeSpecificPart ?: return
         val number = PhoneNumberNormalizer.normalizePolish(rawNumber) ?: return
         val direction = if (incoming) CallDirection.INCOMING else CallDirection.OUTGOING
