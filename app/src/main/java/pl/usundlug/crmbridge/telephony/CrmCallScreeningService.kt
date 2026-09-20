@@ -36,21 +36,27 @@ class CrmCallScreeningService : CallScreeningService() {
         val number = PhoneNumberNormalizer.normalizePolish(rawNumber) ?: return
         val direction = if (incoming) CallDirection.INCOMING else CallDirection.OUTGOING
         val startedAt = callDetails.creationTimeMillis.takeIf { it > 0L } ?: System.currentTimeMillis()
-        val eventUuid = UUID.randomUUID().toString()
         val app = application as CrmBridgeApp
         if (incoming) app.deviceStore.callerCardRinging = true
 
-        // Persist the session before any network request so call completion can still
-        // be resolved when CRM is slow or temporarily unavailable.
-        app.callSessionStore.save(
-            CallSession(
-                eventUuid = eventUuid,
-                clientId = null,
-                phone = number,
-                direction = direction,
-                startedAtEpochMs = startedAt
-            )
+        // Samsung may deliver CallScreeningService and PHONE_STATE in either order.
+        // Reuse the same recent session so CRM gets one complete call row instead of
+        // two partial rows (or no final row at all).
+        val existing = app.callSessionStore.current()
+        val reusable = existing?.takeIf {
+            it.phone == number &&
+                it.direction == direction &&
+                kotlin.math.abs(it.startedAtEpochMs - startedAt) <= 20_000L
+        }
+        val sessionSeed = reusable ?: CallSession(
+            eventUuid = UUID.randomUUID().toString(),
+            clientId = null,
+            phone = number,
+            direction = direction,
+            startedAtEpochMs = startedAt
         )
+        val eventUuid = sessionSeed.eventUuid
+        app.callSessionStore.save(sessionSeed)
 
         scope.launch {
             // Caller ID during ringing must not wait for the network. If the encrypted
