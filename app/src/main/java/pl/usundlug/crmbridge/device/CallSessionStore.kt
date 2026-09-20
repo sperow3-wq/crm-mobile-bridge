@@ -65,6 +65,12 @@ class CallSessionStore(context: Context) {
         prefs.edit().clear().apply()
     }
 
+    fun clearIf(eventUuid: String) {
+        if (prefs.getString(KEY_EVENT_UUID, null) == eventUuid) {
+            prefs.edit().clear().apply()
+        }
+    }
+
     companion object {
         private const val KEY_EVENT_UUID = "event_uuid"
         private const val KEY_CLIENT_ID = "client_id"
