@@ -48,6 +48,8 @@ import java.util.Date
 import java.util.Locale
 
 class CallerIdActivity : ComponentActivity() {
+    private val uiState = androidx.compose.runtime.mutableStateOf(CallerUiState())
+
     private val closeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == ACTION_CLOSE_CALLER_ID) finish()
@@ -58,41 +60,55 @@ class CallerIdActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setShowWhenLocked(true)
         setTurnScreenOn(true)
-
-        val clientId = intent.getLongExtra(EXTRA_CLIENT_ID, -1L).takeIf { it > 0L }
-        val name = intent.getStringExtra(EXTRA_CLIENT_NAME) ?: "Nieznany numer"
-        val product = intent.getStringExtra(EXTRA_PRODUCT).orEmpty()
-        val stage = intent.getStringExtra(EXTRA_STAGE).orEmpty()
-        val guardian = intent.getStringExtra(EXTRA_GUARDIAN).orEmpty()
-        val phone = intent.getStringExtra(EXTRA_PHONE).orEmpty()
-        val matched = intent.getBooleanExtra(EXTRA_MATCHED, false)
-        val overdueCount = intent.getIntExtra(EXTRA_OVERDUE_COUNT, 0)
-        val overdueAmount = intent.getDoubleExtra(EXTRA_OVERDUE_AMOUNT, 0.0)
-        val currency = intent.getStringExtra(EXTRA_CURRENCY) ?: "PLN"
-        val dataSource = intent.getStringExtra(EXTRA_DATA_SOURCE).orEmpty()
-        val dataUpdatedAt = intent.getLongExtra(EXTRA_DATA_UPDATED_AT, 0L)
-        val lookupError = intent.getStringExtra(EXTRA_LOOKUP_ERROR).orEmpty()
+        uiState.value = readUiState(intent)
 
         setContent {
             MaterialTheme {
+                val state = uiState.value
                 CallerIdScreen(
-                    name = name,
-                    product = product,
-                    stage = stage,
-                    guardian = guardian,
-                    phone = phone,
-                    matched = matched,
-                    overdueCount = overdueCount,
-                    overdueAmount = overdueAmount,
-                    currency = currency,
-                    offlineData = dataSource == "CACHE",
-                    dataUpdatedAtEpochMs = dataUpdatedAt,
-                    lookupError = lookupError,
-                    canOpenHistory = clientId != null,
-                    onOpenHistory = { clientId?.let(::openClientHistory) }
+                    name = state.name,
+                    product = state.product,
+                    stage = state.stage,
+                    guardian = state.guardian,
+                    phone = state.phone,
+                    matched = state.matched,
+                    overdueCount = state.overdueCount,
+                    overdueAmount = state.overdueAmount,
+                    currency = state.currency,
+                    offlineData = state.offlineData,
+                    dataUpdatedAtEpochMs = state.dataUpdatedAtEpochMs,
+                    lookupError = state.lookupError,
+                    canOpenHistory = state.clientId != null,
+                    onOpenHistory = { state.clientId?.let(::openClientHistory) }
                 )
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        uiState.value = readUiState(intent)
+    }
+
+    private fun readUiState(intent: Intent): CallerUiState {
+        val clientId = intent.getLongExtra(EXTRA_CLIENT_ID, -1L).takeIf { it > 0L }
+        val source = intent.getStringExtra(EXTRA_DATA_SOURCE).orEmpty()
+        return CallerUiState(
+            clientId = clientId,
+            name = intent.getStringExtra(EXTRA_CLIENT_NAME) ?: "Nieznany numer",
+            product = intent.getStringExtra(EXTRA_PRODUCT).orEmpty(),
+            stage = intent.getStringExtra(EXTRA_STAGE).orEmpty(),
+            guardian = intent.getStringExtra(EXTRA_GUARDIAN).orEmpty(),
+            phone = intent.getStringExtra(EXTRA_PHONE).orEmpty(),
+            matched = intent.getBooleanExtra(EXTRA_MATCHED, false),
+            overdueCount = intent.getIntExtra(EXTRA_OVERDUE_COUNT, 0),
+            overdueAmount = intent.getDoubleExtra(EXTRA_OVERDUE_AMOUNT, 0.0),
+            currency = intent.getStringExtra(EXTRA_CURRENCY) ?: "PLN",
+            offlineData = source == "CACHE",
+            dataUpdatedAtEpochMs = intent.getLongExtra(EXTRA_DATA_UPDATED_AT, 0L),
+            lookupError = intent.getStringExtra(EXTRA_LOOKUP_ERROR).orEmpty()
+        )
     }
 
     private fun openClientHistory(clientId: Long) {
@@ -148,6 +164,22 @@ class CallerIdActivity : ComponentActivity() {
         const val ACTION_CLOSE_CALLER_ID = "pl.usundlug.crmbridge.CLOSE_CALLER_ID"
     }
 }
+
+private data class CallerUiState(
+    val clientId: Long? = null,
+    val name: String = "Nieznany numer",
+    val product: String = "",
+    val stage: String = "",
+    val guardian: String = "",
+    val phone: String = "",
+    val matched: Boolean = false,
+    val overdueCount: Int = 0,
+    val overdueAmount: Double = 0.0,
+    val currency: String = "PLN",
+    val offlineData: Boolean = false,
+    val dataUpdatedAtEpochMs: Long = 0L,
+    val lookupError: String = ""
+)
 
 @Composable
 private fun CallerIdScreen(
@@ -220,8 +252,9 @@ private fun CallerIdScreen(
                     if (product.isNotBlank()) {
                         Text(product, color = Color.White.copy(alpha = 0.92f), fontSize = 21.sp)
                     }
-                    if (stage.isNotBlank()) {
-                        Text(stage, color = Color.White.copy(alpha = 0.92f), fontSize = 20.sp)
+                    val stageLabel = formatStageLabel(stage)
+                    if (stageLabel.isNotBlank()) {
+                        Text(stageLabel, color = Color.White.copy(alpha = 0.92f), fontSize = 20.sp)
                     }
                     if (guardian.isNotBlank()) {
                         Spacer(Modifier.height(7.dp))
@@ -230,11 +263,6 @@ private fun CallerIdScreen(
 
                     Spacer(Modifier.height(24.dp))
                     FinancialStatus(overdueCount, overdueAmount, currency)
-
-                    if (offlineData) {
-                        Spacer(Modifier.height(12.dp))
-                        OfflineDataStatus(dataUpdatedAtEpochMs)
-                    }
 
                     if (canOpenHistory) {
                         Spacer(Modifier.height(14.dp))
@@ -265,11 +293,7 @@ private fun CallerIdScreen(
 
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = if (offlineData) {
-                        "CRM Mobile Bridge • dane z pamięci telefonu"
-                    } else {
-                        "CRM Mobile Bridge • dane z karty klienta"
-                    },
+                    text = "CRM Mobile Bridge",
                     color = Color.White.copy(alpha = 0.40f),
                     fontSize = 13.sp
                 )
@@ -355,6 +379,32 @@ private fun OfflineDataStatus(updatedAtEpochMs: Long) {
             }
         }
     }
+}
+
+private fun formatStageLabel(raw: String): String {
+    val stage = raw.trim()
+    if (stage.isBlank() || stage == "—") return ""
+
+    val normalized = stage.lowercase(Locale("pl", "PL"))
+    if (
+        normalized == "oczekuje na e1" ||
+        normalized == "oczekuje na etap 1" ||
+        normalized == "brak_wplat" ||
+        normalized == "brak wpłat" ||
+        normalized == "brak wplat" ||
+        normalized == "przed etapem 1"
+    ) {
+        return "Przed Etapem 1"
+    }
+
+    Regex("""(?i)^e\s*(\d+)\s*(?:/\s*\d+)?$""").matchEntire(stage)?.let {
+        return "Etap ${it.groupValues[1].toIntOrNull() ?: it.groupValues[1]}"
+    }
+    Regex("""(?i)^etap[_\s-]*(\d+)$""").matchEntire(stage)?.let {
+        return "Etap ${it.groupValues[1].toIntOrNull() ?: it.groupValues[1]}"
+    }
+
+    return stage
 }
 
 private fun formatMoney(amount: Double, currencyCode: String): String {
