@@ -85,6 +85,18 @@ class PhoneStateReceiver : BroadcastReceiver() {
                         app.deviceStore.lastClientId = cached.clientId
                         app.deviceStore.lastClientName = cached.clientName
                         app.deviceStore.lastCallerIdStatus = "RINGING/CACHE: ${cached.clientName ?: "klient CRM"}"
+                        if (cached.clientId != null) {
+                            val current = app.callSessionStore.current() ?: session
+                            val enriched = current.copy(clientId = cached.clientId)
+                            app.callSessionStore.save(enriched)
+                            app.repository.sendCallStarted(
+                                phone = number,
+                                direction = CallDirection.INCOMING,
+                                clientId = cached.clientId,
+                                eventUuid = enriched.eventUuid,
+                                startedAtEpochMs = enriched.startedAtEpochMs
+                            )
+                        }
                         if (app.deviceStore.callerCardRinging) {
                             CallerIdPresenter.show(context, app, number, cached, null)
                         }
@@ -96,6 +108,18 @@ class PhoneStateReceiver : BroadcastReceiver() {
                             app.deviceStore.lastClientId = fresh.clientId
                             app.deviceStore.lastClientName = fresh.clientName
                             app.deviceStore.lastCallerIdStatus = "RINGING/CRM: ${fresh.clientName ?: "klient CRM"}"
+                            if (fresh.clientId != null) {
+                                val current = app.callSessionStore.current() ?: session
+                                val enriched = current.copy(clientId = fresh.clientId)
+                                app.callSessionStore.save(enriched)
+                                app.repository.sendCallStarted(
+                                    phone = number,
+                                    direction = CallDirection.INCOMING,
+                                    clientId = fresh.clientId,
+                                    eventUuid = enriched.eventUuid,
+                                    startedAtEpochMs = enriched.startedAtEpochMs
+                                )
+                            }
                             if (app.deviceStore.callerCardRinging) {
                                 CallerIdPresenter.show(context, app, number, fresh, null)
                             }
