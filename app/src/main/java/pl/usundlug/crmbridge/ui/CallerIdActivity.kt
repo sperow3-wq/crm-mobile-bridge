@@ -67,6 +67,14 @@ class CallerIdActivity : ComponentActivity() {
         }
     }
 
+    private val refreshReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != ACTION_REFRESH_CALLER_ID) return
+            val refreshIntent = intent ?: return
+            uiState.value = readUiState(refreshIntent)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setShowWhenLocked(true)
@@ -235,17 +243,22 @@ class CallerIdActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        val filter = IntentFilter(ACTION_CLOSE_CALLER_ID)
+        val closeFilter = IntentFilter(ACTION_CLOSE_CALLER_ID)
+        val refreshFilter = IntentFilter(ACTION_REFRESH_CALLER_ID)
         if (Build.VERSION.SDK_INT >= 33) {
-            registerReceiver(closeReceiver, filter, RECEIVER_NOT_EXPORTED)
+            registerReceiver(closeReceiver, closeFilter, RECEIVER_NOT_EXPORTED)
+            registerReceiver(refreshReceiver, refreshFilter, RECEIVER_NOT_EXPORTED)
         } else {
             @Suppress("DEPRECATION")
-            registerReceiver(closeReceiver, filter)
+            registerReceiver(closeReceiver, closeFilter)
+            @Suppress("DEPRECATION")
+            registerReceiver(refreshReceiver, refreshFilter)
         }
     }
 
     override fun onStop() {
         runCatching { unregisterReceiver(closeReceiver) }
+        runCatching { unregisterReceiver(refreshReceiver) }
         super.onStop()
     }
 
@@ -264,6 +277,7 @@ class CallerIdActivity : ComponentActivity() {
         const val EXTRA_DATA_UPDATED_AT = "data_updated_at"
         const val EXTRA_LOOKUP_ERROR = "lookup_error"
         const val ACTION_CLOSE_CALLER_ID = "pl.usundlug.crmbridge.CLOSE_CALLER_ID"
+        const val ACTION_REFRESH_CALLER_ID = "pl.usundlug.crmbridge.REFRESH_CALLER_ID"
     }
 }
 
