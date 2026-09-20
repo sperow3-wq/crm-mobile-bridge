@@ -30,7 +30,7 @@ object CallerIdPresenter {
             putExtra(CallerIdActivity.EXTRA_STAGE, client.stage ?: "")
             putExtra(
                 CallerIdActivity.EXTRA_GUARDIAN,
-                client.guardianName ?: app.deviceStore.employeeName.orEmpty()
+                client.guardianName.orEmpty()
             )
             putExtra(CallerIdActivity.EXTRA_MATCHED, client.matched)
             putExtra(CallerIdActivity.EXTRA_OVERDUE_COUNT, client.overdueInvoicesCount)
@@ -54,6 +54,18 @@ object CallerIdPresenter {
         } else {
             number
         }
+
+        // Always refresh an already visible caller card directly. This avoids
+        // relying on Activity recreation/orientation changes for new CRM data.
+        context.sendBroadcast(
+            Intent(CallerIdActivity.ACTION_REFRESH_CALLER_ID)
+                .setPackage(context.packageName)
+                .putExtras(intent.extras ?: android.os.Bundle())
+        )
+
+        // Never resurrect the caller UI after the call has already been answered,
+        // rejected or disconnected.
+        if (!app.deviceStore.callerCardRinging) return
 
         CallerIdNotifier.show(context, intent, title, text)
         runCatching { context.startActivity(intent) }
