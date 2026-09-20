@@ -42,6 +42,7 @@ object CallerIdPresenter {
             putExtra(CallerIdActivity.EXTRA_CALL_STATE, ActiveCallRegistry.state)
             putExtra(CallerIdActivity.EXTRA_MUTED, ActiveCallRegistry.muted)
             putExtra(CallerIdActivity.EXTRA_SPEAKER, ActiveCallRegistry.speaker)
+            putExtra(CallerIdActivity.EXTRA_INCOMING, ActiveCallRegistry.incoming)
         }
 
         val title = if (client.matched) {
