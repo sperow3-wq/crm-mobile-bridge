@@ -11,6 +11,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import pl.usundlug.crmbridge.CrmBridgeApp
 import pl.usundlug.crmbridge.data.CompletedCallContext
+import pl.usundlug.crmbridge.data.ResolvedCall
 import pl.usundlug.crmbridge.notifications.CallerIdNotifier
 import pl.usundlug.crmbridge.ui.CallerIdActivity
 import pl.usundlug.crmbridge.util.PhoneNumberNormalizer
@@ -24,6 +25,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
         val app = context.applicationContext as CrmBridgeApp
 
         if (state == TelephonyManager.EXTRA_STATE_RINGING) {
+            app.deviceStore.callerCardRinging = true
             val rawNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
             val number = PhoneNumberNormalizer.normalizePolish(rawNumber)
             if (number == null) {
@@ -48,7 +50,9 @@ class PhoneStateReceiver : BroadcastReceiver() {
                         app.deviceStore.lastClientId = cached.clientId
                         app.deviceStore.lastClientName = cached.clientName
                         app.deviceStore.lastCallerIdStatus = "RINGING/CACHE: ${cached.clientName ?: "klient CRM"}"
-                        CallerIdPresenter.show(context, app, number, cached, null)
+                        if (app.deviceStore.callerCardRinging) {
+                            CallerIdPresenter.show(context, app, number, cached, null)
+                        }
                     }
 
                     val freshResult = runCatching { app.repository.identifyClient(number) }
@@ -57,7 +61,9 @@ class PhoneStateReceiver : BroadcastReceiver() {
                             app.deviceStore.lastClientId = fresh.clientId
                             app.deviceStore.lastClientName = fresh.clientName
                             app.deviceStore.lastCallerIdStatus = "RINGING/CRM: ${fresh.clientName ?: "klient CRM"}"
-                            CallerIdPresenter.show(context, app, number, fresh, null)
+                            if (app.deviceStore.callerCardRinging) {
+                                CallerIdPresenter.show(context, app, number, fresh, null)
+                            }
                         } else if (cached == null) {
                             app.deviceStore.lastCallerIdStatus = "RINGING: brak dopasowania $number"
                         }
@@ -76,12 +82,15 @@ class PhoneStateReceiver : BroadcastReceiver() {
         // Once the call is answered, close the CRM caller card so Android's regular
         // in-call UI is unobstructed. The activity also closes on IDLE.
         if (state == TelephonyManager.EXTRA_STATE_OFFHOOK) {
+            app.deviceStore.callerCardRinging = false
+            app.callSessionStore.markAnswered()
             context.sendBroadcast(Intent(CallerIdActivity.ACTION_CLOSE_CALLER_ID).setPackage(context.packageName))
             CallerIdNotifier.cancel(context)
             return
         }
 
         if (state != TelephonyManager.EXTRA_STATE_IDLE) return
+        app.deviceStore.callerCardRinging = false
         context.sendBroadcast(Intent(CallerIdActivity.ACTION_CLOSE_CALLER_ID).setPackage(context.packageName))
         CallerIdNotifier.cancel(context)
 
@@ -99,30 +108,52 @@ class PhoneStateReceiver : BroadcastReceiver() {
                     resolved = CallLogResolver(context).resolve(session, endedAt)
                 }
 
-                if (resolved != null) {
-                    val finalCall = resolved!!
-                    val sent = runCatching {
-                        app.repository.sendCallFinished(session, finalCall)
-                    }.isSuccess
-                    if (sent) {
-                        if (finalCall.durationSeconds > 0L || finalCall.status in setOf("answered", "completed")) {
-                            val cachedClient = session.clientId?.let { app.clientCacheStore.findByClientId(it) }
-                            val completed = CompletedCallContext(
-                                eventUuid = session.eventUuid,
-                                clientId = session.clientId,
-                                clientName = cachedClient?.clientName,
-                                phone = finalCall.phone,
-                                direction = finalCall.direction,
-                                status = finalCall.status,
-                                startedAtEpochMs = finalCall.startedAtEpochMs,
-                                endedAtEpochMs = finalCall.endedAtEpochMs,
-                                durationSeconds = finalCall.durationSeconds
-                            )
-                            app.callWrapUpStore.save(completed)
-                            app.postCallNotifier.show(completed)
-                        }
-                        app.callSessionStore.clear()
+                val finalCall = resolved ?: run {
+                    val answered = app.callSessionStore.wasAnswered()
+                    val answeredAt = app.callSessionStore.answeredAtEpochMs()
+                    val rejectedByApp = app.callSessionStore.wasRejectedByApp()
+                    val duration = if (answered && answeredAt != null) {
+                        ((endedAt - answeredAt).coerceAtLeast(0L) / 1000L)
+                    } else 0L
+                    val fallbackStatus = when {
+                        session.direction.name == "OUTGOING" && answered -> "answered"
+                        session.direction.name == "OUTGOING" -> "not_connected"
+                        rejectedByApp -> "rejected"
+                        answered -> "answered"
+                        else -> "missed"
                     }
+                    ResolvedCall(
+                        phone = session.phone,
+                        direction = session.direction,
+                        startedAtEpochMs = session.startedAtEpochMs,
+                        endedAtEpochMs = endedAt,
+                        durationSeconds = duration,
+                        status = fallbackStatus
+                    )
+                }
+
+                val sent = runCatching {
+                    app.repository.sendCallFinished(session, finalCall)
+                }.isSuccess
+
+                if (sent) {
+                    if (finalCall.durationSeconds > 0L || finalCall.status in setOf("answered", "completed")) {
+                        val cachedClient = session.clientId?.let { app.clientCacheStore.findByClientId(it) }
+                        val completed = CompletedCallContext(
+                            eventUuid = session.eventUuid,
+                            clientId = session.clientId,
+                            clientName = cachedClient?.clientName,
+                            phone = finalCall.phone,
+                            direction = finalCall.direction,
+                            status = finalCall.status,
+                            startedAtEpochMs = finalCall.startedAtEpochMs,
+                            endedAtEpochMs = finalCall.endedAtEpochMs,
+                            durationSeconds = finalCall.durationSeconds
+                        )
+                        app.callWrapUpStore.save(completed)
+                        app.postCallNotifier.show(completed)
+                    }
+                    app.callSessionStore.clear()
                 }
             } finally {
                 pendingResult.finish()
