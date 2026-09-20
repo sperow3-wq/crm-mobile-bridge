@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -328,38 +329,6 @@ private fun CallerIdScreen(
                     Spacer(Modifier.height(24.dp))
                     FinancialStatus(overdueCount, overdueAmount, currency)
 
-                    Spacer(Modifier.height(18.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Button(
-                            onClick = onReject,
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFB3261E),
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Icon(Icons.Rounded.CallEnd, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Odrzuć", fontWeight = FontWeight.Bold)
-                        }
-
-                        Button(
-                            onClick = onAnswer,
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF1E8E3E),
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Icon(Icons.Rounded.Call, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Odbierz", fontWeight = FontWeight.Bold)
-                        }
-                    }
-
                     if (canOpenHistory) {
                         Spacer(Modifier.height(14.dp))
                         FilledTonalButton(onClick = onOpenHistory) {
@@ -388,6 +357,39 @@ private fun CallerIdScreen(
                 }
 
                 Spacer(Modifier.weight(1f))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = onReject,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFB3261E),
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Icon(Icons.Rounded.CallEnd, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Odrzuć", fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = onAnswer,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF1E8E3E),
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Icon(Icons.Rounded.Call, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Odbierz", fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Spacer(Modifier.height(14.dp))
                 Text(
                     text = "CRM Mobile Bridge",
                     color = Color.White.copy(alpha = 0.40f),
