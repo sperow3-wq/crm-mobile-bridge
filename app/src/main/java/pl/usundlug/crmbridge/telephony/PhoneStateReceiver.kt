@@ -57,7 +57,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
                             app.deviceStore.lastClientId = fresh.clientId
                             app.deviceStore.lastClientName = fresh.clientName
                             app.deviceStore.lastCallerIdStatus = "RINGING/CRM: ${fresh.clientName ?: "klient CRM"}"
-                            if (cached == null) CallerIdPresenter.show(context, app, number, fresh, null)
+                            CallerIdPresenter.show(context, app, number, fresh, null)
                         } else if (cached == null) {
                             app.deviceStore.lastCallerIdStatus = "RINGING: brak dopasowania $number"
                         }
