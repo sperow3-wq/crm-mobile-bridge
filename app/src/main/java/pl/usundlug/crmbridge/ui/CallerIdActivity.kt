@@ -142,11 +142,12 @@ class CallerIdActivity : ComponentActivity() {
         val app = application as CrmBridgeApp
 
         refreshJob = lifecycleScope.launch {
-            repeat(4) { attempt ->
-                if (!app.deviceStore.callerCardRinging && !ActiveCallRegistry.hasCall()) return@launch
+            var first = true
+            while (app.deviceStore.callerCardRinging || ActiveCallRegistry.hasCall()) {
                 val fresh = runCatching { app.repository.identifyClient(phone) }.getOrNull()
                 if (fresh?.matched == true) applyClient(fresh)
-                if (attempt < 3) delay(if (attempt == 0) 350L else 900L)
+                delay(if (first) 350L else 1_000L)
+                first = false
             }
         }
     }
@@ -184,7 +185,8 @@ class CallerIdActivity : ComponentActivity() {
             lookupError = intent.getStringExtra(EXTRA_LOOKUP_ERROR).orEmpty(),
             callState = intent.getIntExtra(EXTRA_CALL_STATE, defaultState),
             muted = intent.getBooleanExtra(EXTRA_MUTED, ActiveCallRegistry.muted),
-            speaker = intent.getBooleanExtra(EXTRA_SPEAKER, ActiveCallRegistry.speaker)
+            speaker = intent.getBooleanExtra(EXTRA_SPEAKER, ActiveCallRegistry.speaker),
+            incoming = intent.getBooleanExtra(EXTRA_INCOMING, ActiveCallRegistry.incoming)
         )
     }
 
@@ -326,6 +328,7 @@ class CallerIdActivity : ComponentActivity() {
         const val EXTRA_CALL_STATE = "call_state"
         const val EXTRA_MUTED = "muted"
         const val EXTRA_SPEAKER = "speaker"
+        const val EXTRA_INCOMING = "incoming"
         const val ACTION_CLOSE_CALLER_ID = "pl.usundlug.crmbridge.CLOSE_CALLER_ID"
         const val ACTION_REFRESH_CALLER_ID = "pl.usundlug.crmbridge.REFRESH_CALLER_ID"
         const val ACTION_CALL_STATE = "pl.usundlug.crmbridge.CALL_STATE"
@@ -346,7 +349,8 @@ private data class CallerUiState(
     val lookupError: String = "",
     val callState: Int = Call.STATE_RINGING,
     val muted: Boolean = false,
-    val speaker: Boolean = false
+    val speaker: Boolean = false,
+    val incoming: Boolean = true
 )
 
 @Composable
@@ -362,7 +366,11 @@ private fun CallerIdScreen(
 ) {
     val top = Color(0xFF14283A)
     val bottom = Color(0xFF050B12)
-    val isRinging = state.callState == Call.STATE_RINGING
+    val isRinging = state.incoming && state.callState in setOf(
+        Call.STATE_NEW,
+        Call.STATE_CONNECTING,
+        Call.STATE_RINGING
+    )
     val isActive = state.callState == Call.STATE_ACTIVE || state.callState == Call.STATE_HOLDING
     val title = when {
         isRinging -> "Połączenie przychodzące"
