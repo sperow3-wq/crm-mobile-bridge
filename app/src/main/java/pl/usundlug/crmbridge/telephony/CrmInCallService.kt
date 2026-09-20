@@ -13,6 +13,7 @@ import pl.usundlug.crmbridge.data.CallDirection
 import pl.usundlug.crmbridge.data.CallSession
 import pl.usundlug.crmbridge.data.CompletedCallContext
 import pl.usundlug.crmbridge.data.ResolvedCall
+import pl.usundlug.crmbridge.notifications.CallerIdNotifier
 import pl.usundlug.crmbridge.ui.CallerIdActivity
 import pl.usundlug.crmbridge.util.PhoneNumberNormalizer
 import java.util.UUID
@@ -42,8 +43,11 @@ class CrmInCallService : InCallService() {
 
     override fun onCallRemoved(call: Call) {
         callbacks.remove(call)?.let { runCatching { call.unregisterCallback(it) } }
-        closeOwnCallUi()
-        ActiveCallRegistry.clear(call)
+        if (ActiveCallRegistry.isCurrent(call)) {
+            closeOwnCallUi()
+            CallerIdNotifier.cancel(this)
+            ActiveCallRegistry.clear(call)
+        }
         super.onCallRemoved(call)
     }
 
@@ -79,10 +83,13 @@ class CrmInCallService : InCallService() {
             Call.STATE_DISCONNECTED,
             Call.STATE_DISCONNECTING -> {
                 if (state == Call.STATE_DISCONNECTED) {
-                    app.deviceStore.callerCardRinging = false
-                    finalizeSession(call, number)
-                    closeOwnCallUi()
-                    ActiveCallRegistry.clear(call)
+                    if (ActiveCallRegistry.isCurrent(call)) {
+                        app.deviceStore.callerCardRinging = false
+                        finalizeSession(call, number)
+                        closeOwnCallUi()
+                        CallerIdNotifier.cancel(this)
+                        ActiveCallRegistry.clear(call)
+                    }
                 }
             }
         }
@@ -227,7 +234,9 @@ class CrmInCallService : InCallService() {
                 app.callWrapUpStore.save(completed)
                 app.postCallNotifier.show(completed)
             }
-            app.callSessionStore.clear()
+            // A slow network response from the previous call must never erase
+            // a new call which has already started.
+            app.callSessionStore.clearIf(session.eventUuid)
         }
     }
 
