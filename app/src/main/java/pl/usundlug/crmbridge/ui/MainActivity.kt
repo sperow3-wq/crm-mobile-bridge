@@ -272,6 +272,7 @@ private fun SetupScreen(
                     arrayOf(
                         Manifest.permission.READ_PHONE_STATE,
                         Manifest.permission.READ_PHONE_NUMBERS,
+                        Manifest.permission.ANSWER_PHONE_CALLS,
                         Manifest.permission.READ_CONTACTS,
                         Manifest.permission.READ_CALL_LOG,
                         Manifest.permission.READ_SMS,
