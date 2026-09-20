@@ -38,6 +38,7 @@ class CrmCallScreeningService : CallScreeningService() {
         val startedAt = callDetails.creationTimeMillis.takeIf { it > 0L } ?: System.currentTimeMillis()
         val eventUuid = UUID.randomUUID().toString()
         val app = application as CrmBridgeApp
+        if (incoming) app.deviceStore.callerCardRinging = true
 
         // Persist the session before any network request so call completion can still
         // be resolved when CRM is slow or temporarily unavailable.
@@ -59,7 +60,7 @@ class CrmCallScreeningService : CallScreeningService() {
             app.deviceStore.lastCallerIdAtEpochMs = System.currentTimeMillis()
 
             val cached = app.clientCacheStore.find(number)
-            if (incoming && app.deviceStore.callerIdEnabled && cached != null) {
+            if (incoming && app.deviceStore.callerIdEnabled && app.deviceStore.callerCardRinging && cached != null) {
                 app.deviceStore.lastCallerIdStatus = "CACHE: ${cached.clientName ?: "klient CRM"}"
                 CallerIdPresenter.show(this@CrmCallScreeningService, app, number, cached, null)
             }
@@ -115,7 +116,7 @@ class CrmCallScreeningService : CallScreeningService() {
             // Cache can be shown immediately, but the live CRM response always
             // replaces it on the same caller card. This keeps stage/payment data
             // current without waiting for the next call.
-            if (incoming && app.deviceStore.callerIdEnabled) {
+            if (incoming && app.deviceStore.callerIdEnabled && app.deviceStore.callerCardRinging) {
                 CallerIdPresenter.show(this@CrmCallScreeningService, app, number, client, lookupError)
             }
         }
