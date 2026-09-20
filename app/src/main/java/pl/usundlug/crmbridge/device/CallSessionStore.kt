@@ -8,13 +8,21 @@ class CallSessionStore(context: Context) {
     private val prefs = context.getSharedPreferences("crm_mobile_call_session", Context.MODE_PRIVATE)
 
     fun save(session: CallSession) {
-        prefs.edit()
+        val previousUuid = prefs.getString(KEY_EVENT_UUID, null)
+        val edit = prefs.edit()
             .putString(KEY_EVENT_UUID, session.eventUuid)
             .putLong(KEY_CLIENT_ID, session.clientId ?: -1L)
             .putString(KEY_PHONE, session.phone)
             .putString(KEY_DIRECTION, session.direction.name)
             .putLong(KEY_STARTED_AT, session.startedAtEpochMs)
-            .apply()
+
+        if (previousUuid != session.eventUuid) {
+            edit
+                .putBoolean(KEY_WAS_ANSWERED, false)
+                .remove(KEY_ANSWERED_AT)
+                .putBoolean(KEY_REJECTED_BY_APP, false)
+        }
+        edit.apply()
     }
 
     fun current(): CallSession? {
