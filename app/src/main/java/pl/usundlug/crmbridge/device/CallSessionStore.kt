@@ -35,6 +35,24 @@ class CallSessionStore(context: Context) {
         )
     }
 
+    fun markAnswered(atEpochMs: Long = System.currentTimeMillis()) {
+        prefs.edit()
+            .putLong(KEY_ANSWERED_AT, atEpochMs.coerceAtLeast(0L))
+            .putBoolean(KEY_WAS_ANSWERED, true)
+            .apply()
+    }
+
+    fun wasAnswered(): Boolean = prefs.getBoolean(KEY_WAS_ANSWERED, false)
+
+    fun answeredAtEpochMs(): Long? =
+        prefs.getLong(KEY_ANSWERED_AT, 0L).takeIf { it > 0L }
+
+    fun markRejectedByApp() {
+        prefs.edit().putBoolean(KEY_REJECTED_BY_APP, true).apply()
+    }
+
+    fun wasRejectedByApp(): Boolean = prefs.getBoolean(KEY_REJECTED_BY_APP, false)
+
     fun clear() {
         prefs.edit().clear().apply()
     }
@@ -45,5 +63,8 @@ class CallSessionStore(context: Context) {
         private const val KEY_PHONE = "phone"
         private const val KEY_DIRECTION = "direction"
         private const val KEY_STARTED_AT = "started_at"
+        private const val KEY_WAS_ANSWERED = "was_answered"
+        private const val KEY_ANSWERED_AT = "answered_at"
+        private const val KEY_REJECTED_BY_APP = "rejected_by_app"
     }
 }
