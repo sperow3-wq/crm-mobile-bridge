@@ -28,8 +28,8 @@ android {
         applicationId = "pl.usundlug.crmbridge"
         minSdk = 26
         targetSdk = 36
-        versionCode = 16
-        versionName = "0.8.8"
+        versionCode = 17
+        versionName = "0.8.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
