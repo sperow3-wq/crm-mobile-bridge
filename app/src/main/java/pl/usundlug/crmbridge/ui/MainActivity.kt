@@ -5,6 +5,8 @@ import android.app.role.RoleManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -51,6 +53,25 @@ import java.util.Date
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
+    private val dialerRoleLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val active = runCatching {
+            val roleManager = getSystemService(RoleManager::class.java)
+            roleManager?.isRoleHeld(RoleManager.ROLE_DIALER) == true
+        }.getOrDefault(false)
+
+        Toast.makeText(
+            this,
+            if (active || result.resultCode == android.app.Activity.RESULT_OK) {
+                "CRM Mobile Bridge jest teraz domyślną aplikacją Telefon."
+            } else {
+                "Nie nadano roli Telefon. Wybierz CRM Mobile Bridge w ustawieniach aplikacji domyślnych."
+            },
+            Toast.LENGTH_LONG
+        ).show()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val app = application as CrmBridgeApp
@@ -76,11 +97,42 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestDialerRole() {
-        val roleManager = getSystemService(RoleManager::class.java) ?: return
-        if (roleManager.isRoleAvailable(RoleManager.ROLE_DIALER) &&
-            !roleManager.isRoleHeld(RoleManager.ROLE_DIALER)
-        ) {
-            startActivity(roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER))
+        val roleManager = getSystemService(RoleManager::class.java)
+        if (roleManager?.isRoleHeld(RoleManager.ROLE_DIALER) == true) {
+            Toast.makeText(this, "CRM Mobile Bridge jest już domyślną aplikacją Telefon.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val launched = if (roleManager?.isRoleAvailable(RoleManager.ROLE_DIALER) == true) {
+            runCatching {
+                dialerRoleLauncher.launch(roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER))
+                true
+            }.getOrDefault(false)
+        } else {
+            false
+        }
+
+        if (!launched) {
+            val opened = runCatching {
+                startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+                true
+            }.getOrDefault(false)
+
+            if (!opened) {
+                runCatching {
+                    startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = android.net.Uri.parse("package:$packageName")
+                        }
+                    )
+                }
+            }
+
+            Toast.makeText(
+                this,
+                "Otwieram ustawienia. Ustaw CRM Mobile Bridge jako domyślną aplikację Telefon.",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 }
