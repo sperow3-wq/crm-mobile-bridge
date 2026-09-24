@@ -206,6 +206,22 @@ class CrmRepository(
         )
     }
 
+    /** A presence ping is intentionally not queued: a delayed ping must never replay after the final event. */
+    suspend fun sendCallTalking(session: CallSession, durationSeconds: Long) = withContext(Dispatchers.IO) {
+        if (deviceStore.deviceToken.isNullOrBlank()) return@withContext
+        val payload = JSONObject()
+            .put("event_uuid", session.eventUuid)
+            .put("phone", session.phone)
+            .put("device_uuid", deviceStore.deviceUuid)
+            .put("employee_id", deviceStore.employeeId ?: JSONObject.NULL)
+            .put("client_id", session.clientId ?: JSONObject.NULL)
+            .put("direction", session.direction.name.lowercase())
+            .put("started_at_epoch_ms", session.startedAtEpochMs)
+            .put("duration_seconds", durationSeconds)
+            .put("status", "talking")
+        api.post("/api/mobile/call/event", payload, deviceStore.deviceToken)
+    }
+
     suspend fun sendSms(event: SmsEvent) = withContext(Dispatchers.IO) {
         val payload = JSONObject()
             .put("event_uuid", event.eventUuid)
