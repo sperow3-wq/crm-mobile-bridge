@@ -147,13 +147,15 @@ class PhoneStateReceiver : BroadcastReceiver() {
         // in-call UI is unobstructed. The activity also closes on IDLE.
         if (state == TelephonyManager.EXTRA_STATE_OFFHOOK) {
             app.deviceStore.callerCardRinging = false
-            app.callSessionStore.markAnswered()
+            if (!app.callSessionStore.wasAnswered()) app.callSessionStore.markAnswered()
+            app.callSessionStore.current()?.let { MobileCallPresence.start(app, it) }
             context.sendBroadcast(Intent(CallerIdActivity.ACTION_CLOSE_CALLER_ID).setPackage(context.packageName))
             CallerIdNotifier.cancel(context)
             return
         }
 
         if (state != TelephonyManager.EXTRA_STATE_IDLE) return
+        MobileCallPresence.stop(app.callSessionStore.current()?.eventUuid)
         app.deviceStore.callerCardRinging = false
         context.sendBroadcast(Intent(CallerIdActivity.ACTION_CLOSE_CALLER_ID).setPackage(context.packageName))
         CallerIdNotifier.cancel(context)
