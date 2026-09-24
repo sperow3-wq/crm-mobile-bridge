@@ -68,14 +68,17 @@ class CrmInCallService : InCallService() {
             Call.STATE_ACTIVE,
             Call.STATE_HOLDING -> {
                 app.deviceStore.callerCardRinging = true
-                if (state == Call.STATE_ACTIVE) app.callSessionStore.markAnswered()
                 if (number != null) {
                     val direction = if (call.details.callDirection == Call.Details.DIRECTION_OUTGOING) {
                         CallDirection.OUTGOING
                     } else {
                         CallDirection.INCOMING
                     }
-                    ensureSession(number, direction)
+                    val session = ensureSession(number, direction)
+                    if (state == Call.STATE_ACTIVE && session != null) {
+                        if (!app.callSessionStore.wasAnswered()) app.callSessionStore.markAnswered()
+                        MobileCallPresence.start(app, session)
+                    }
                     showClient(call, number)
                 }
             }
@@ -85,6 +88,7 @@ class CrmInCallService : InCallService() {
                 if (state == Call.STATE_DISCONNECTED) {
                     if (ActiveCallRegistry.isCurrent(call)) {
                         app.deviceStore.callerCardRinging = false
+                        MobileCallPresence.stop(app.callSessionStore.current()?.eventUuid)
                         finalizeSession(call, number)
                         closeOwnCallUi()
                         CallerIdNotifier.cancel(this)
@@ -104,7 +108,7 @@ class CrmInCallService : InCallService() {
         if (current != null &&
             current.phone == number &&
             current.direction == direction &&
-            kotlin.math.abs(current.startedAtEpochMs - now) <= 60_000L
+            current.startedAtEpochMs <= now
         ) return current
 
         val created = CallSession(
